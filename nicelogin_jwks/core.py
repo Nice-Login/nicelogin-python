@@ -9,14 +9,14 @@ from typing import Dict, Any
 
 
 class NiceLoginJWKS:
-    """Verificador de tokens JWT do NiceLogin."""
+    """NiceLogin JWT token verifier."""
 
     def __init__(self, jwks: Dict[str, Any]):
         """
-        Inicializa com JWKS (JSON Web Key Set).
+        Initialize with JWKS (JSON Web Key Set).
 
         Args:
-            jwks: Dict com formato {"keys": [{"kty": "RSA", "n": "...", "e": "...", "kid": "..."}]}
+            jwks: Dict with format {"keys": [{"kty": "RSA", "n": "...", "e": "...", "kid": "..."}]}
         """
         self._keys = {}
         for key in jwks.get("keys", []):
@@ -29,10 +29,10 @@ class NiceLoginJWKS:
 
     def verify_token(self, token: str) -> bool:
         """
-        Verifica se o token é válido.
+        Verify if token is valid.
 
         Returns:
-            True se válido, False se inválido ou expirado.
+            True if valid, False if invalid or expired.
         """
         try:
             self._verify_and_decode(token)
@@ -42,17 +42,17 @@ class NiceLoginJWKS:
 
     def unpack(self, token: str, verify: bool = True) -> Dict[str, Any]:
         """
-        Extrai o payload do token.
+        Extract token payload.
 
         Args:
             token: JWT string
-            verify: Se True, verifica assinatura antes (default: True)
+            verify: If True, verify signature first (default: True)
 
         Returns:
-            Dict com claims: sub, email, company_id, exp, iat, jti, sid, user_data
+            Dict with claims: sub, email, company_id, exp, iat, jti, sid, user_data
 
         Raises:
-            ValueError: Se token inválido ou expirado
+            ValueError: If token is invalid or expired
         """
         if verify:
             return self._verify_and_decode(token)
@@ -64,22 +64,22 @@ class NiceLoginJWKS:
             return json.loads(payload)
 
     def _verify_and_decode(self, token: str) -> Dict[str, Any]:
-        """Verifica assinatura RS256 e retorna payload."""
+        """Verify RS256 signature and return payload."""
         parts = token.split(".")
         if len(parts) != 3:
             raise ValueError("Invalid token format")
 
         header_b64, payload_b64, signature_b64 = parts
 
-        # Decode header para pegar kid
+        # Decode header to get kid
         header = json.loads(self._b64url_decode(header_b64))
         if header.get("alg") != "RS256":
             raise ValueError(f"Unsupported algorithm: {header.get('alg')}")
 
-        # Buscar chave pelo kid
+        # Find key by kid
         kid = header.get("kid", "default")
         if kid not in self._keys:
-            # Tenta primeira chave se kid não encontrado
+            # Try first key if kid not found
             if self._keys:
                 kid = next(iter(self._keys))
             else:
@@ -87,7 +87,7 @@ class NiceLoginJWKS:
 
         key = self._keys[kid]
 
-        # Verificar assinatura RS256
+        # Verify RS256 signature
         message = f"{header_b64}.{payload_b64}".encode("ascii")
         signature = self._b64url_decode_bytes(signature_b64)
 
@@ -97,7 +97,7 @@ class NiceLoginJWKS:
         # Decode payload
         payload = json.loads(self._b64url_decode(payload_b64))
 
-        # Verificar expiração
+        # Verify expiration
         exp = payload.get("exp")
         if exp and time.time() > exp:
             raise ValueError("Token expired")
@@ -105,11 +105,11 @@ class NiceLoginJWKS:
         return payload
 
     def _verify_rs256(self, message: bytes, signature: bytes, n: int, e: int) -> bool:
-        """Verifica assinatura RSA PKCS#1 v1.5 com SHA256."""
-        # Hash da mensagem
+        """Verify RSA PKCS#1 v1.5 signature with SHA256."""
+        # Hash the message
         digest = hashlib.sha256(message).digest()
 
-        # DigestInfo para SHA256 (DER encoded)
+        # DigestInfo for SHA256 (DER encoded)
         digest_info = bytes([
             0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86,
             0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
@@ -120,18 +120,18 @@ class NiceLoginJWKS:
         sig_int = int.from_bytes(signature, "big")
         decrypted_int = pow(sig_int, e, n)
 
-        # Converter para bytes (tamanho da chave)
+        # Convert to bytes (key size)
         key_size = (n.bit_length() + 7) // 8
         decrypted = decrypted_int.to_bytes(key_size, "big")
 
-        # Verificar padding PKCS#1 v1.5
-        # Formato: 0x00 0x01 [0xFF padding] 0x00 [DigestInfo]
+        # Verify PKCS#1 v1.5 padding
+        # Format: 0x00 0x01 [0xFF padding] 0x00 [DigestInfo]
         if len(decrypted) < 11:
             return False
         if decrypted[0] != 0x00 or decrypted[1] != 0x01:
             return False
 
-        # Encontrar separador 0x00 após padding
+        # Find 0x00 separator after padding
         separator_idx = None
         for i in range(2, len(decrypted)):
             if decrypted[i] == 0x00:
@@ -143,27 +143,27 @@ class NiceLoginJWKS:
         if separator_idx is None or separator_idx < 10:
             return False
 
-        # Comparar DigestInfo
+        # Compare DigestInfo
         return decrypted[separator_idx + 1:] == digest_info
 
     @staticmethod
     def _b64url_decode(data: str) -> str:
-        """Decode base64url para string."""
+        """Decode base64url to string."""
         return NiceLoginJWKS._b64url_decode_bytes(data).decode("utf-8")
 
     @staticmethod
     def _b64url_decode_bytes(data: str) -> bytes:
-        """Decode base64url para bytes."""
-        # Adicionar padding se necessário
+        """Decode base64url to bytes."""
+        # Add padding if needed
         padding = 4 - len(data) % 4
         if padding != 4:
             data += "=" * padding
-        # Converter base64url para base64
+        # Convert base64url to base64
         data = data.replace("-", "+").replace("_", "/")
         return base64.b64decode(data)
 
     @staticmethod
     def _b64url_to_int(data: str) -> int:
-        """Decode base64url para integer."""
+        """Decode base64url to integer."""
         decoded = NiceLoginJWKS._b64url_decode_bytes(data)
         return int.from_bytes(decoded, "big")

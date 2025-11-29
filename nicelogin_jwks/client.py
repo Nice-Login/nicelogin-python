@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 
 
 class NiceLoginError(Exception):
-    """Erro da API NiceLogin."""
+    """NiceLogin API error."""
     def __init__(self, message: str, status: int = 0):
         self.message = message
         self.status = status
@@ -16,7 +16,7 @@ class NiceLoginError(Exception):
 
 
 class NiceLogin:
-    """Cliente NiceLogin para operações de autenticação."""
+    """NiceLogin client for authentication operations."""
 
     def __init__(
         self,
@@ -25,12 +25,12 @@ class NiceLogin:
         base_url: str = "https://api.v1.nicelogin.com"
     ):
         """
-        Inicializa o cliente NiceLogin.
+        Initialize the NiceLogin client.
 
         Args:
-            api_key: Chave de API da empresa
-            api_secret: Segredo de API (necessário para activate/deactivate_user)
-            base_url: URL base da API
+            api_key: Company API key
+            api_secret: API secret (required for activate/deactivate_user)
+            base_url: API base URL
         """
         self.api_key = api_key
         self.api_secret = api_secret
@@ -38,16 +38,16 @@ class NiceLogin:
 
     def request_password_reset(self, email: str) -> str:
         """
-        Solicita token de reset de senha.
+        Request a password reset token.
 
         Args:
-            email: Email do usuário
+            email: User email
 
         Returns:
-            Token de reset (válido por 24h)
+            Reset token (valid for 24h)
 
         Raises:
-            NiceLoginError: Se erro na requisição
+            NiceLoginError: If request fails
         """
         data = {"email": email, "api_key": self.api_key}
         resp = self._post("/request_password_reset", data)
@@ -61,19 +61,19 @@ class NiceLogin:
         reset_token: str
     ) -> bool:
         """
-        Reseta a senha usando token de reset.
+        Reset password using a reset token.
 
         Args:
-            email: Email do usuário
-            current_password: Senha atual
-            new_password: Nova senha
-            reset_token: Token obtido via request_password_reset()
+            email: User email
+            current_password: Current password
+            new_password: New password
+            reset_token: Token obtained via request_password_reset()
 
         Returns:
-            True se sucesso
+            True if successful
 
         Raises:
-            NiceLoginError: Se erro na requisição
+            NiceLoginError: If request fails
         """
         data = {
             "email": email,
@@ -93,54 +93,54 @@ class NiceLogin:
         new_password: str
     ) -> bool:
         """
-        Troca a senha (solicita token internamente).
+        Change password (requests token internally).
 
         Args:
-            email: Email do usuário
-            current_password: Senha atual
-            new_password: Nova senha
+            email: User email
+            current_password: Current password
+            new_password: New password
 
         Returns:
-            True se sucesso
+            True if successful
 
         Raises:
-            NiceLoginError: Se erro na requisição
+            NiceLoginError: If request fails
         """
         reset_token = self.request_password_reset(email)
         return self.reset_password(email, current_password, new_password, reset_token)
 
     def activate_user(self, user_id: str) -> bool:
         """
-        Ativa um usuário.
+        Activate a user.
 
         Args:
-            user_id: UUID do usuário
+            user_id: User UUID
 
         Returns:
-            True se sucesso
+            True if successful
 
         Raises:
-            NiceLoginError: Se erro ou api_secret não configurado
+            NiceLoginError: If request fails or api_secret not configured
         """
         return self._toggle_user_status(user_id, True)
 
     def deactivate_user(self, user_id: str) -> bool:
         """
-        Desativa um usuário.
+        Deactivate a user.
 
         Args:
-            user_id: UUID do usuário
+            user_id: User UUID
 
         Returns:
-            True se sucesso
+            True if successful
 
         Raises:
-            NiceLoginError: Se erro ou api_secret não configurado
+            NiceLoginError: If request fails or api_secret not configured
         """
         return self._toggle_user_status(user_id, False)
 
     def _toggle_user_status(self, user_id: str, is_active: bool) -> bool:
-        """Toggle status do usuário."""
+        """Toggle user status."""
         if not self.api_secret:
             raise NiceLoginError("api_secret required for user status operations", 401)
         data = {
@@ -152,11 +152,11 @@ class NiceLogin:
         return resp.get("is_active") == is_active
 
     def _post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Faz requisição POST."""
+        """Make POST request."""
         return self._request("POST", endpoint, data)
 
     def _patch(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Faz requisição PATCH."""
+        """Make PATCH request."""
         return self._request("PATCH", endpoint, data)
 
     def _request(
@@ -165,7 +165,7 @@ class NiceLogin:
         endpoint: str,
         data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Faz requisição HTTP."""
+        """Make HTTP request."""
         url = f"{self.base_url}{endpoint}"
         req = urllib.request.Request(
             url,
